@@ -9,12 +9,14 @@
     "title": "Example client site",
     "url": "https://example.com",
     "year": 2025,
-    "description": "Two or three sentences: who it was for, what you did, what was hard about it. Specific beats impressive."
+    "description": "Two or three sentences: who it was for, what you did, what was hard about it. Specific beats impressive.",
+    "image": "thumbs/example-com.jpg"
   },
   {
     "title": "Weekend experiment",
     "url": "https://example.org",
     "year": 2024,
-    "description": "Something small you built because you wanted to. These are often the most interesting entries on a portfolio."
+    "description": "Something small you built because you wanted to. These are often the most interesting entries on a portfolio.",
+    "image": "thumbs/example-org.jpg"
   }
 ]
