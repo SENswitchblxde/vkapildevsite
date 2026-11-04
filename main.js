@@ -32,22 +32,27 @@ function renderThumb(screen, project) {
   const img = el("img");
   img.alt = "";
   img.decoding = "async";
-  img.loading = "lazy";
   screen.append(img);
 
   const sources = [...(project.image ? [project.image] : []), microlink(project.url)];
   let i = 0;
+  let timer = null;
 
   const fallback = () => {
+    clearTimeout(timer);
     if (screen.querySelector(".screen-fallback")) return;
     img.onload = img.onerror = null;
     img.remove();
     screen.append(el("span", "screen-fallback", domainOf(project.url)));
   };
-  const next = () => (i < sources.length ? (img.src = sources[i++]) : fallback());
-
-  // A screenshot service that hangs shouldn't leave a blank card.
-  const timer = setTimeout(() => { if (!img.classList.contains("ready")) { i = sources.length; next(); } }, 8000);
+  const next = () => {
+    clearTimeout(timer);
+    if (i >= sources.length) return fallback();
+    const src = sources[i++];
+    // Only the remote screenshot service can hang; give it 10 seconds.
+    if (/^https?:/.test(src)) timer = setTimeout(next, 10000);
+    img.src = src;
+  };
 
   img.onerror = next;
   img.onload = () => {
@@ -55,8 +60,8 @@ function renderThumb(screen, project) {
     const ratio = img.naturalWidth / img.naturalHeight;
     const remote = /^https?:/.test(img.getAttribute("src"));
     if (remote && Math.abs(ratio - SHOT_W / SHOT_H) > 0.05) return next();
-    img.classList.add("ready");
     clearTimeout(timer);
+    img.classList.add("ready");
   };
   next();
 }
