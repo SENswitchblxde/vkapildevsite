@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kapil</title>
-  <meta name="description" content="Websites designed and built by Kapil.">
+  <title>Vikrant Kapil</title>
+  <meta name="description" content="Websites designed and built by Vikrant Kapil.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
@@ -13,12 +13,8 @@
 </head>
 <body>
   <header class="top">
-    <a class="name" href="/">Kapil</a>
-    <nav class="links" aria-label="Elsewhere">
-      <!-- TODO: your real links -->
-      <a href="https://github.com/your-handle">GitHub</a>
-      <a href="mailto:hello@vkapil.dev">Email</a>
-    </nav>
+    <a class="name" href="/">Vikrant Kapil</a>
+    <a href="mailto:vikrantkapil02@gmail.com">Email</a>
   </header>
 
   <main>
@@ -27,25 +23,21 @@
       <h1>I design and build websites. Here are the ones I'm happy to put my name on.</h1>
     </section>
 
-    <section class="work" aria-label="Websites">
-      <ol class="list" id="list"></ol>
-
-      <aside class="viewer" id="viewer" aria-live="polite">
-        <div class="frame">
-          <div class="frame-bar"><span id="viewer-domain"></span></div>
-          <div class="screen" id="viewer-screen"></div>
+    <section class="work" aria-labelledby="work-label">
+      <h2 class="visually-hidden" id="work-label">Websites</h2>
+      <ol class="deck" id="deck"></ol>
+      <div class="caption" id="caption" aria-live="polite">
+        <p class="caption-idle" id="caption-idle"></p>
+        <div class="caption-card" id="caption-card" hidden>
+          <p class="caption-title"><span id="caption-title"></span> <span class="caption-domain" id="caption-domain"></span></p>
+          <p class="caption-desc" id="caption-desc"></p>
         </div>
-        <h2 class="viewer-title"><a id="viewer-link" href="#" target="_blank" rel="noopener"></a></h2>
-        <p class="viewer-desc" id="viewer-desc"></p>
-      </aside>
+      </div>
     </section>
-
-    <p class="status" id="status" hidden></p>
   </main>
 
   <footer class="bottom">
-    <!-- TODO -->
-    <p>Want a site? Write to <a href="mailto:hello@vkapil.dev">hello@vkapil.dev</a>.</p>
+    <p>Want a site? <a href="mailto:vikrantkapil02@gmail.com">vikrantkapil02@gmail.com</a></p>
   </footer>
 </body>
 </html>

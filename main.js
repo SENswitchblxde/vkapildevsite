@@ -1,19 +1,15 @@
 // Projects come from projects.json. Each one: { title, url, year, description, image? }
-// "image" is filled in by `npm run add` / `npm run shoot`. Without it, a free
+// "image" is filled in by the GitHub Action / `npm run shoot`. Without it, a free
 // screenshot service (Microlink) is used at page load, and if that fails
 // the domain name is shown instead.
 
 const SHOT_W = 1280;
 const SHOT_H = 800;
-
-const remoteProviders = [
-  (url) =>
-    `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=${SHOT_W}&viewport.height=${SHOT_H}`,
-];
+const microlink = (url) =>
+  `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=${SHOT_W}&viewport.height=${SHOT_H}`;
 
 const $ = (id) => document.getElementById(id);
-const wide = window.matchMedia("(min-width: 900px)");
-const resolved = new Map(); // url -> working image src (or null if none)
+const canHover = window.matchMedia("(hover: hover) and (min-width: 720px)");
 
 function domainOf(url) {
   try {
@@ -24,138 +20,146 @@ function domainOf(url) {
   }
 }
 
-function fallback(screen, project) {
-  screen.querySelector("img")?.remove();
-  if (screen.querySelector(".screen-fallback")) return;
-  const div = document.createElement("div");
-  div.className = "screen-fallback";
-  div.textContent = domainOf(project.url);
-  screen.append(div);
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
 }
 
 // Fill a .screen element with the project's homepage thumbnail.
-function renderThumb(screen, project, { lazy = false } = {}) {
-  screen.replaceChildren();
-  const img = document.createElement("img");
-  img.alt = `Homepage of ${project.title}`;
+function renderThumb(screen, project) {
+  const img = el("img");
+  img.alt = "";
   img.decoding = "async";
-  if (lazy) img.loading = "lazy";
+  img.loading = "lazy";
   screen.append(img);
 
-  const known = resolved.get(project.url);
-  if (known === null) return fallback(screen, project);
-
-  const sources = known
-    ? [known]
-    : [...(project.image ? [project.image] : []), ...remoteProviders.map((p) => p(project.url))];
-
+  const sources = [...(project.image ? [project.image] : []), microlink(project.url)];
   let i = 0;
 
-  const tryNext = () => {
-    if (i >= sources.length) {
-      resolved.set(project.url, null);
-      return fallback(screen, project);
-    }
-    img.src = sources[i++];
+  const fallback = () => {
+    if (screen.querySelector(".screen-fallback")) return;
+    img.onload = img.onerror = null;
+    img.remove();
+    screen.append(el("span", "screen-fallback", domainOf(project.url)));
   };
+  const next = () => (i < sources.length ? (img.src = sources[i++]) : fallback());
 
-  img.onerror = tryNext;
+  // A screenshot service that hangs shouldn't leave a blank card.
+  const timer = setTimeout(() => { if (!img.classList.contains("ready")) { i = sources.length; next(); } }, 8000);
+
+  img.onerror = next;
   img.onload = () => {
-    // A real remote screenshot has our 16:10 ratio. Anything else is an
-    // error or placeholder image from the service, so move on.
+    // A real remote screenshot is 16:10. Anything else is an error image.
     const ratio = img.naturalWidth / img.naturalHeight;
-    const isRemote = /^https?:/.test(img.getAttribute("src"));
-    if (isRemote && Math.abs(ratio - SHOT_W / SHOT_H) > 0.05) return tryNext();
-    resolved.set(project.url, img.src);
+    const remote = /^https?:/.test(img.getAttribute("src"));
+    if (remote && Math.abs(ratio - SHOT_W / SHOT_H) > 0.05) return next();
     img.classList.add("ready");
+    clearTimeout(timer);
   };
-
-  tryNext();
+  next();
 }
 
-function select(project, button) {
-  document.querySelectorAll(".row[aria-pressed]").forEach((b) => b.setAttribute("aria-pressed", "false"));
-  button.setAttribute("aria-pressed", "true");
+function buildCard(project) {
+  const year = String(project.year ?? "");
+  const domain = domainOf(project.url);
 
-  const link = $("viewer-link");
-  link.href = project.url;
-  link.textContent = project.title;
-  $("viewer-domain").textContent = domainOf(project.url);
-  $("viewer-desc").textContent = project.description || "";
-  renderThumb($("viewer-screen"), project);
+  const li = el("li", "slot");
+  const a = el("a", "card");
+  a.href = project.url;
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.setAttribute("aria-label", `${project.title}, ${domain} (opens in a new tab)`);
+
+  const windowEl = el("span", "window");
+  const screen = el("span", "screen");
+  windowEl.append(screen);
+  renderThumb(screen, project);
+
+  a.append(
+    el("span", "corner", year),
+    windowEl,
+    el("span", "card-title", project.title),
+    el("span", "card-domain", domain),
+    el("span", "corner corner-end", year)
+  );
+  a.querySelectorAll(".corner").forEach((c) => c.setAttribute("aria-hidden", "true"));
+
+  li.append(a, el("p", "slot-desc", project.description || ""));
+  return li;
+}
+
+// Small deterministic jitter so the pile looks hand-stacked, not random each load.
+const jitter = (i) => {
+  const x = Math.sin((i + 1) * 12.9898) * 43758.5453;
+  return x - Math.floor(x) - 0.5; // -0.5 .. 0.5
+};
+
+function layout(deck, slots) {
+  const n = slots.length;
+  const cw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--cw")) || 248;
+  const room = Math.max(0, Math.min(deck.parentElement.clientWidth, 1100) - cw - 48);
+  const fanWidth = n > 1 ? Math.min(170 * (n - 1), room) : 0;
+  const spread = n > 1 ? Math.min(11 * (n - 1), 60) : 0;
+
+  // Only the area the fanned cards cover triggers the fan.
+  deck.style.setProperty("--deck-w", `${fanWidth + cw + 48}px`);
+
+  slots.forEach((slot, i) => {
+    const t = n > 1 ? i / (n - 1) - 0.5 : 0; // -0.5 .. 0.5, left to right
+    slot.style.setProperty("--sr", i === 0 ? "-1.5deg" : `${jitter(i) * 7}deg`);
+    slot.style.setProperty("--sx", `${i === 0 ? 0 : jitter(i + 7) * 12}px`);
+    slot.style.setProperty("--sy", `${i * 1.5}px`);
+    slot.style.setProperty("--fr", `${t * spread}deg`);
+    slot.style.setProperty("--fx", `${t * fanWidth}px`);
+    slot.style.setProperty("--fy", `${(2 * t) ** 2 * 22}px`);
+    slot.style.setProperty("--z", n - i); // pile: first site on top
+    slot.style.setProperty("--fz", i + 1); // fan: each card over its left neighbour
+  });
 }
 
 function build(projects) {
-  const list = $("list");
-  let current = null;
+  const deck = $("deck");
+  const slots = projects.map(buildCard);
+  deck.append(...slots);
 
-  projects.forEach((project, index) => {
-    const li = document.createElement("li");
+  const idle = `${projects.length} ${projects.length === 1 ? "site" : "sites"}. Point at the deck to spread it out, click a card to visit.`;
+  $("caption-idle").textContent = idle;
 
-    const row = document.createElement("button");
-    row.className = "row";
-    row.type = "button";
-    row.setAttribute("aria-pressed", "false");
-    row.innerHTML = `<span class="year"></span><span class="title"></span><span class="domain"></span>`;
-    row.querySelector(".year").textContent = project.year ?? "";
-    row.querySelector(".title").textContent = project.title;
-    row.querySelector(".domain").textContent = domainOf(project.url);
+  const show = (project) => {
+    $("caption-title").textContent = project.title;
+    $("caption-domain").textContent = domainOf(project.url);
+    $("caption-desc").textContent = project.description || "";
+    $("caption-idle").hidden = true;
+    $("caption-card").hidden = false;
+  };
+  const reset = () => {
+    $("caption-idle").hidden = false;
+    $("caption-card").hidden = true;
+  };
 
-    const choose = () => {
-      if (!wide.matches || current === index) return;
-      current = index;
-      select(project, row);
-    };
-    row.addEventListener("mouseenter", choose);
-    row.addEventListener("focus", choose);
-    row.addEventListener("click", () => {
-      if (wide.matches) choose();
-      else window.open(project.url, "_blank", "noopener");
-    });
-    row.addEventListener("keydown", (e) => {
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      e.preventDefault();
-      const rows = [...list.querySelectorAll(".row")];
-      rows[Math.max(0, Math.min(rows.length - 1, index + (e.key === "ArrowDown" ? 1 : -1)))].focus();
-    });
+  slots.forEach((slot, i) => {
+    slot.addEventListener("mouseenter", () => show(projects[i]));
+    slot.addEventListener("focusin", () => show(projects[i]));
+  });
+  deck.addEventListener("mouseleave", () => { if (!deck.contains(document.activeElement)) reset(); });
+  deck.addEventListener("focusout", (e) => { if (!deck.contains(e.relatedTarget)) reset(); });
 
-    // Inline version for small screens
-    const detail = document.createElement("div");
-    detail.className = "detail";
-    detail.innerHTML = `
-      <div class="frame"><div class="frame-bar"></div><div class="screen"></div></div>
-      <p></p>
-      <a target="_blank" rel="noopener"></a>`;
-    detail.querySelector(".frame-bar").textContent = domainOf(project.url);
-    detail.querySelector("p").textContent = project.description || "";
-    const a = detail.querySelector("a");
-    a.href = project.url;
-    a.textContent = `Open ${domainOf(project.url)}`;
-
-    li.append(row, detail);
-    list.append(li);
+  // Arrow keys move between cards.
+  deck.addEventListener("keydown", (e) => {
+    if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+    const cards = [...deck.querySelectorAll(".card")];
+    const at = cards.indexOf(document.activeElement);
+    if (at < 0) return;
+    e.preventDefault();
+    cards[Math.max(0, Math.min(cards.length - 1, at + (e.key === "ArrowRight" ? 1 : -1)))].focus();
   });
 
-  // Only load the thumbnails the current layout shows.
-  let mobileLoaded = false;
-  const layout = () => {
-    const rows = list.querySelectorAll(".row");
-    if (wide.matches) {
-      if (current === null && rows[0]) { current = 0; select(projects[0], rows[0]); }
-    } else if (!mobileLoaded) {
-      mobileLoaded = true;
-      list.querySelectorAll(".detail .screen").forEach((s, i) => renderThumb(s, projects[i], { lazy: true }));
-    }
-  };
-  wide.addEventListener("change", layout);
-  layout();
-}
-
-function status(text) {
-  const el = $("status");
-  el.textContent = text;
-  el.hidden = false;
-  $("viewer").hidden = true;
+  const relayout = () => layout(deck, slots);
+  relayout();
+  window.addEventListener("resize", relayout);
+  canHover.addEventListener("change", relayout);
 }
 
 fetch("projects.json", { cache: "no-cache" })
@@ -165,10 +169,12 @@ fetch("projects.json", { cache: "no-cache" })
   })
   .then((projects) => {
     if (!Array.isArray(projects) || projects.length === 0) {
-      return status("No sites yet. Add one with npm run add.");
+      $("caption-idle").textContent = "No sites yet.";
+      return;
     }
     build(projects);
   })
-  .catch(() =>
-    status("Couldn't load projects.json. Open the page through a local server (npm run dev) instead of double-clicking index.html.")
-  );
+  .catch(() => {
+    $("caption-idle").textContent =
+      "Couldn't load projects.json. Open the page through a local server (npm run dev) instead of double-clicking index.html.";
+  });
