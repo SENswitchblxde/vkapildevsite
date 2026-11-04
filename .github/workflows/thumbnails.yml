@@ -50,5 +50,11 @@ jobs:
             echo "No changes."
           else
             git commit -m "Update thumbnails"
-            git push
+            # GitHub occasionally rejects pushes with a transient 500; retry.
+            for attempt in 1 2 3 4; do
+              git pull --rebase --quiet && git push && exit 0
+              echo "Push failed (attempt $attempt), retrying..."
+              sleep $((attempt * 10))
+            done
+            exit 1
           fi
