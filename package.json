@@ -1,0 +1,14 @@
+{
+  "name": "vkapil-portfolio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes serve .",
+    "add": "node scripts/add.mjs",
+    "shoot": "node scripts/shoot.mjs",
+    "shoot:all": "node scripts/shoot.mjs --all"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}
